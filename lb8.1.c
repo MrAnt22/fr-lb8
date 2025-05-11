@@ -1,39 +1,37 @@
 #include <stdio.h>
 #include <unistd.h>
-#include <fcntl.h>
 #include <string.h>
+#include <fcntl.h>
 #include <errno.h>
 
-int main(){
-	char buffer[] = "AAAAAAAAAaaaaaaaa aaaaAAAA bbbbBBbbBBbbBbBBBBbbBBbb";
-	int fd[2];
+int main() {
+    int pipefd[2];
+    if (pipe(pipefd) == -1) {
+        perror("pipe");
+        return 1;
+    }
 
-	if (pipe(fd) == -1){
-		perror("pipe");
-		return 1;
-	}
+    fcntl(pipefd[1], F_SETFL, O_NONBLOCK);
 
-	fcntl(fd[1], F_SETFL, O_NONBLOCK);
+    char buffer[4096];
+    memset(buffer, 'A', sizeof(buffer));
 
-	for (int i = 0; i < 10000; ++i){
-		write(fd[1], "a", 1);
-	}
+    ssize_t total_written = 0;
+    while (1) {
+        ssize_t count = write(pipefd[1], buffer, sizeof(buffer));
+        if (count == -1) {
+            perror("write");
+            break;
+        } else if (count < sizeof(buffer)) {
+            printf("Written: %zd with %zu bytes\n", count, sizeof(buffer));
+            break;
+        } else {
+            total_written += count;
+            printf("Writen %zd bytes: %zd\n", count, total_written);
+        }
+    }
 
-	ssize_t count = write(fd[1], buffer, strlen(buffer));
-
-	if (count == -1){
-		perror("write");
-	}
-	else{
-		printf("requested %ld bytes|wroted %ld bytes\n", strlen(buffer), count);
-	}
-
-	close(fd[0]);
-	close(fd[1]);
-	return 0;
+    close(pipefd[0]);
+    close(pipefd[1]);
+    return 0;
 }
-
-
-
-
-
